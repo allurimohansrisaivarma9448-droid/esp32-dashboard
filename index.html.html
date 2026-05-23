@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Circuit Voltage Monitoring System</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      margin: 0;
+      transition: 0.3s;
+    }
+
+    .dark {
+      background: #000;
+      color: #fff;
+    }
+
+    .light {
+      background: #fff;
+      color: #000;
+    }
+
+    h1 {
+      padding: 20px;
+      margin: 0;
+      text-align: center;
+    }
+
+    .toggle-btn {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .values {
+      display: flex;
+      justify-content: space-around;
+      margin: 20px;
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .card {
+      padding: 15px;
+      border-radius: 12px;
+      transition: 0.3s;
+    }
+
+    .dark .card {
+      background: #111;
+    }
+
+    .light .card {
+      background: #f1f1f1;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 200px !important;
+    }
+
+    .footer {
+      padding: 20px;
+      margin-top: 20px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .dark .footer {
+      background: #050505;
+      color: #bbb;
+    }
+
+    .light .footer {
+      background: #e5e5e5;
+      color: #333;
+    }
+  </style>
+</head>
+
+<body class="dark">
+
+<div class="toggle-btn" onclick="toggleTheme()">🌙</div>
+
+<h1>⚡ Circuit Voltage Monitoring System</h1>
+
+<!-- 🔥 LIVE VALUES -->
+<div class="values">
+  <div>Voltage: <span id="voltageVal">--</span> V</div>
+  <div>Current: <span id="currentVal">--</span> mA</div>
+  <div>Power: <span id="powerVal">--</span> mW</div>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h3>Voltage</h3>
+    <canvas id="voltageChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h3>Current</h3>
+    <canvas id="currentChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h3>Power</h3>
+    <canvas id="powerChart"></canvas>
+  </div>
+</div>
+
+<div class="footer">
+  <h3>📌 Project Info</h3>
+  <p>
+    This system uses an ESP32 with an INA219 sensor to monitor
+    real-time electrical parameters including voltage, current, and power.
+  </p>
+  <p>
+    Designed for circuit analysis, power tracking, and embedded monitoring applications.
+  </p>
+  <p>
+    Tech Stack: ESP32 + INA219 + Firebase + Chart.js
+  </p>
+</div>
+
+<script>
+const url = "https://esp32-power-e61e4-default-rtdb.firebaseio.com/.json";
+
+let labels = [];
+let voltageData = [];
+let currentData = [];
+let powerData = [];
+
+let voltageChart, currentChart, powerChart;
+
+// Create chart
+function createChart(ctx, label, color, dataArray) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: label,
+        data: dataArray,
+        borderColor: color,
+        tension: 0,
+        fill: false
+      }]
+    },
+    options: {
+      plugins: {
+        legend: {
+          labels: { color: getTextColor() }
+        }
+      },
+      scales: {
+        x: { ticks: { color: getTextColor() }},
+        y: { ticks: { color: getTextColor() }}
+      }
+    }
+  });
+}
+
+// Dynamic text color
+function getTextColor() {
+  return document.body.classList.contains("dark") ? "white" : "black";
+}
+
+// Initialize charts
+function initCharts() {
+  voltageChart = createChart(
+    document.getElementById("voltageChart"),
+    "Voltage", "#00bfff", voltageData
+  );
+
+  currentChart = createChart(
+    document.getElementById("currentChart"),
+    "Current", "#00ff88", currentData
+  );
+
+  powerChart = createChart(
+    document.getElementById("powerChart"),
+    "Power", "#ff4444", powerData
+  );
+}
+
+initCharts();
+
+// Fetch data
+async function fetchData() {
+  const res = await fetch(url);
+  const data = await res.json();
+
+  let v = data.voltage;
+  let c = data.current;
+  let p = data.power;
+
+  let time = new Date().toLocaleTimeString();
+
+  // Update live values
+  document.getElementById("voltageVal").innerText = v.toFixed(2);
+  document.getElementById("currentVal").innerText = c.toFixed(2);
+  document.getElementById("powerVal").innerText = p.toFixed(2);
+
+  labels.push(time);
+  voltageData.push(v);
+  currentData.push(c);
+  powerData.push(p);
+
+  if (labels.length > 20) {
+    labels.shift();
+    voltageData.shift();
+    currentData.shift();
+    powerData.shift();
+  }
+
+  voltageChart.update();
+  currentChart.update();
+  powerChart.update();
+}
+
+setInterval(fetchData, 2000);
+
+// 🌗 FIXED THEME TOGGLE
+function toggleTheme() {
+  const body = document.body;
+  const btn = document.querySelector(".toggle-btn");
+
+  if (body.classList.contains("dark")) {
+    body.classList.remove("dark");
+    body.classList.add("light");
+    btn.innerText = "☀️";
+  } else {
+    body.classList.remove("light");
+    body.classList.add("dark");
+    btn.innerText = "🌙";
+  }
+
+  // Recreate charts to update colors
+  voltageChart.destroy();
+  currentChart.destroy();
+  powerChart.destroy();
+  initCharts();
+}
+</script>
+
+</body>
+</html>
